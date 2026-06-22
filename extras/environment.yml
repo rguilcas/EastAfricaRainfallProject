@@ -1,0 +1,27 @@
+# --- File Documentation ---
+# This file defines the environment for the project. It specifies the Python version and the required packages with their versions. 
+# --------------------------
+
+##
+name: bccr-ml-project
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy=2.4.*
+  - pandas=3.0.*
+  - scipy=1.17.*
+  - scikit-learn=1.8.*
+  - xarray=2026.4.*
+  - netcdf4=1.7.*
+  - pyyaml=6.0.*
+  - lightning=2.6.*
+  - pytorch-lightning=2.6.*
+  - torchmetrics=1.9.*
+  - wandb
+  - ipykernel=7.2.*
+  - tqdm=4.67.*
+
+# PyTorch is intentionally installed in a second step so each platform can
+# select the correct backend (CUDA, MPS, or CPU) reproducibly.
