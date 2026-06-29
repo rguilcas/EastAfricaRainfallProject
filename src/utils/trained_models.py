@@ -56,6 +56,7 @@ def get_trained_model(config, checkpoint_path):
 	# Loads the trained model checkpoint using the RegressionModel Lightning module, which wraps the neural network and handles the prediction logic.
     lightning_model = RegressionModel.load_from_checkpoint(
 		checkpoint_path,
+		map_location="cpu",
 		model=neural_network,
 		learning_rate=config["trainer"]["learning_rate"],
 		target_inverse_transform=target_inverse_transform,

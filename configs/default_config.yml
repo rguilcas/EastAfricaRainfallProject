@@ -5,24 +5,24 @@
 
 
 model:
-  model_name: TwoHiddenLayerMLP   # Can be TwoHiddenLayerMLP, OneHiddenLayerMLP or TwoLayerCNN 
-  hidden_size_mlp: 32             # Number of neurons in the hidden layer for MLP models.
+  model_name: ThreeLayerCNN   # Can be TwoHiddenLayerMLP, OneHiddenLayerMLP or TwoLayerCNN 
+  hidden_size_mlp: 64              # Number of neurons in the hidden layer for MLP models.
   # CNN only
-  input_channels: 1               # Number of input variables. We only have 1 in the file we are using.
-  n_kernels_cnn: 8                # Number of kernels (convolutional filters)in the convolutional layer for CNN models.
-  n_channels_input_cnn: 1         # Number of channels in the input data for CNN models. For example, if you have 3 input variables, this should be set to 3.
+  input_channels: 4              # Number of input variables. We only have 1 in the file we are using.
+  n_kernels_cnn: 8               # Number of kernels (convolutional filters) in the convolutional layers for CNN models.
+  n_channels_input_cnn: 4         # Number of channels in the input data for CNN models. For example, if you have 3 input variables, this should be set to 3.
 
 data:
-  data_in_name: lowres_era5_features.nc                 # Predictor input path: either one NetCDF file or a folder of per-variable NetCDF files.
-  data_target_name: chirps-v2.0.1DD.1981-2025.nc # Name of the target data file.
-  data_path: /Data/gfi/users/rogui7909/data/AfricaPrecip/ # Path to the directory containing the data files.  
+  data_in_name: preprocessed_features.nc                 # Predictor input path: either one NetCDF file or a folder of per-variable NetCDF files.
+  data_target_name: EastAfrica_mean_CHIRPS_7day.nc # Name of the target data file.
+  data_path: ./data # Path to the directory containing the data files.  
   batch_size: 128                                         # Batch size for training and validation.
   transform_X: StandardScalerX                            # Transformation to apply to the input data. Can be None or a class in src.data.transforms. 
   transform_y: None                                       # Transformation to apply to the target data. Can be None or a class in src.data.transforms.        
 
 trainer:
   max_epochs: 20          # Number of epochs to train the model.
-  learning_rate: 0.0001   # Learning rate for the optimizer.
+  learning_rate: 0.0003   # Learning rate for the optimizer.
   accelerator: gpu        # Accelerator to use for training. Can be 'cpu', 'gpu', or other things.  
   devices: 1              # Number of devices to use for training. For example, if you have 2 GPUs and want to use both, set this to 2.
 

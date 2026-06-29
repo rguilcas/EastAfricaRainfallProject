@@ -13,7 +13,7 @@ import xarray as xr
 import numpy as np
 from torch.utils.data import DataLoader
 
-from src.data.dataset import AtmosphereToRainfallDataset, load_predictors
+from src.data.dataset import AtmosphereToRainfallDataset
 
 random_seed = 42
 
@@ -36,7 +36,7 @@ class MyDataModule(L.LightningDataModule):
         self.transform_X = transform_X
         self.transform_y = transform_y
         self._transforms_fitted = False
-        predictor_data = load_predictors(data_path, data_in_name)
+        predictor_data = xr.open_dataarray(os.path.join(data_path, data_in_name))
         self.image_shape = tuple(predictor_data.isel(time=0).shape)
         self.image_size = int(np.prod(self.image_shape[-2:]))
 

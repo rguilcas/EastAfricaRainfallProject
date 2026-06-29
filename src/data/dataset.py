@@ -29,7 +29,7 @@ class AtmosphereToRainfallDataset(Dataset):
         Initializes the dataset by loading the input and target data from NetCDF files, applying any specified transformations, and preparing the data for indexing.
         The dataset also aligns inputs and target data and determines their common time steps. The data are filtered accordingly.
         """
-        ds_in = xr.open_dataarray(os.path.join(data_path, data_in_name), chunks = dict(time=120))
+        ds_in = xr.open_dataarray(os.path.join(data_path, data_in_name))
         ds_target = xr.open_dataarray(os.path.join(data_path, data_target_name))
         ds_target = ds_target.assign_coords(time=pd.to_datetime(ds_target.time.dt.date))
         # computes common times between predictors and targets and filter the data accordingly.
