@@ -7,6 +7,7 @@ The DataModule also applies the specified transformations to the input features 
 
 import os
 import torch
+from pathlib import Path
 
 import lightning as L
 import xarray as xr
@@ -22,7 +23,8 @@ class MyDataModule(L.LightningDataModule):
                  data_path='./data',
                  batch_size=32,
                  years_split = [('1979','2008'), ('2009','2014'), ('2015','2024')],
-                 transform_X=None, transform_y=None):
+                 transform_X=None, transform_y=None,
+                 forecast_horizon_days=0):
         """
         Initializes the MyDataModule with the specified parameters. 
         It takes the names of the input and target data files, the path to the data directory, batch size, years for train/validation/test splits, and any transformations to apply to the input features and target variable.
@@ -30,13 +32,16 @@ class MyDataModule(L.LightningDataModule):
         super().__init__()
         self.data_in_name = data_in_name
         self.data_target_name = data_target_name
-        self.data_path = data_path
+        repo_root = Path(__file__).resolve().parents[2]
+        raw_data_path = Path(data_path)
+        self.data_path = str(raw_data_path if raw_data_path.is_absolute() else (repo_root / raw_data_path))
         self.batch_size = batch_size
         self.train_years, self.val_years, self.test_years = years_split
         self.transform_X = transform_X
         self.transform_y = transform_y
+        self.forecast_horizon_days = int(forecast_horizon_days)
         self._transforms_fitted = False
-        predictor_data = xr.open_dataarray(os.path.join(data_path, data_in_name))
+        predictor_data = xr.open_dataarray(os.path.join(self.data_path, data_in_name))
         self.image_shape = tuple(predictor_data.isel(time=0).shape)
         self.image_size = int(np.prod(self.image_shape[-2:]))
 
@@ -60,6 +65,7 @@ class MyDataModule(L.LightningDataModule):
             self.data_target_name,
             data_path=self.data_path,
             time_slice=self.train_years,
+            forecast_horizon_days=self.forecast_horizon_days,
         )
         if self.transform_X is not None and not getattr(self.transform_X, "fitted", False):
             self.transform_X.fit(dataset_train_for_fit)
@@ -79,12 +85,14 @@ class MyDataModule(L.LightningDataModule):
                 self.data_in_name, 
                 self.data_target_name, 
                 data_path=self.data_path,
-                time_slice=self.train_years)
+                time_slice=self.train_years,
+                forecast_horizon_days=self.forecast_horizon_days)
             self.dataset_val = AtmosphereToRainfallDataset(
                 self.data_in_name, 
                 self.data_target_name, 
                 data_path=self.data_path,
-                time_slice=self.val_years)
+                time_slice=self.val_years,
+                forecast_horizon_days=self.forecast_horizon_days)
             # Data preprocessing: fit on train split once and reuse for all stages.
             self._ensure_transforms_fitted()
             self.dataset_train.transform_X = self.transform_X
@@ -97,14 +105,16 @@ class MyDataModule(L.LightningDataModule):
             self._ensure_transforms_fitted()
             self.dataset_test = AtmosphereToRainfallDataset(self.data_in_name, self.data_target_name, 
                                                             data_path=self.data_path, time_slice=self.test_years,
-                                                            transform_X = self.transform_X, transform_y = self.transform_y)
+                                                            transform_X = self.transform_X, transform_y = self.transform_y,
+                                                            forecast_horizon_days=self.forecast_horizon_days)
         
         # Prediction phase
         if stage == 'predict':
             self._ensure_transforms_fitted()
             self.dataset_predict = AtmosphereToRainfallDataset(self.data_in_name, self.data_target_name, 
                                                             data_path=self.data_path, time_slice = (None, None),
-                                                            transform_X = self.transform_X, transform_y = self.transform_y)
+                                                            transform_X = self.transform_X, transform_y = self.transform_y,
+                                                            forecast_horizon_days=self.forecast_horizon_days)
         
 
     def train_dataloader(self):

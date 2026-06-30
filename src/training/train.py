@@ -10,8 +10,13 @@ from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 
 import src.models.models as models
 from src.data.datamodule import MyDataModule
-from src.models.lightning_module import RegressionModel
-from src.utils.config import load_config, _make_transform
+from src.models.lightning_module import RegressionModel, BinaryClassificationModel
+from src.utils.config import (
+    load_config,
+    _make_transform,
+    resolve_task_type,
+    get_classification_positive_weight,
+)
 
 import argparse
 import os
@@ -53,9 +58,21 @@ def main(config):
     with open(os.path.join(out_dir, "config.yaml"), "w") as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
+    task_type = resolve_task_type(config)
+    forecast_horizon_days = int(
+        config["data"].get("forecast_horizon_days", config["data"].get("forecast_horizon_weeks", 0))
+    )
+    horizon_steps = forecast_horizon_days + 1
+
     # Gets the transformation from the src.data.transforms module based on the name specified in the config. If the name is None or "None", no transformation is applied.
     transform_X = _make_transform(config["data"].get("transform_X"))
     transform_y = _make_transform(config["data"].get("transform_y"))
+
+    if task_type == "classification" and transform_y is None:
+        print(
+            "Warning: classification is running without target binarization. "
+            "Ensure targets are already 0/1 or set data.transform_y to BinaryScalerY."
+        )
 
     # Loads the datamodule using MyDataModule class, which handles loading the dataset and applying the specified transformations.
     datamodule = MyDataModule(
@@ -65,6 +82,7 @@ def main(config):
         batch_size=config['data']['batch_size'],
         transform_X=transform_X,
         transform_y=transform_y,
+        forecast_horizon_days=forecast_horizon_days,
     )
     
     # Builds the model architecture based on the model name specified in the config. The model is initialized with the appropriate parameters, including the image size and number of input channels for the CNN.
@@ -74,7 +92,7 @@ def main(config):
 		"image_size": datamodule.image_size,
 		"n_channels_input_cnn": config["model"]["n_channels_input_cnn"],
 		"input_size": datamodule.image_size * config["model"]["n_channels_input_cnn"],
-		"target_size": 1,
+        "target_size": (2 * horizon_steps) if task_type == "classification" else horizon_steps,
 	}
     constructor_params = inspect.signature(model_class.__init__).parameters
     allowed_kwargs = {
@@ -84,17 +102,27 @@ def main(config):
 	}
     neural_network = model_class(**allowed_kwargs)
 
-    # If the target transformation has an inverse_transform method, it is passed to the RegressionModel to be applied to the predictions and targets during training and validation, allowing them to be evaluated on the original scale of the target variable.
-    target_inverse_transform = None
-    if transform_y is not None and hasattr(transform_y, 'inverse_transform'):
-        target_inverse_transform = transform_y.inverse_transform
-    
-    # Initializes the RegressionModel Lightning module, which wraps the neural network and handles the training logic, including applying the target inverse transformation if specified.
-    lightning_model = RegressionModel(
-        neural_network,
-        learning_rate=config['trainer']['learning_rate'],
-        target_inverse_transform=target_inverse_transform,
-    )
+    if task_type == "classification":
+        positive_class_weight = get_classification_positive_weight(config)
+        # Initializes the classification Lightning module for binary classification.
+        lightning_model = BinaryClassificationModel(
+            neural_network,
+            learning_rate=config['trainer']['learning_rate'],
+            positive_class_weight=positive_class_weight,
+            horizon_steps=horizon_steps,
+        )
+    else:
+        # If the target transformation has an inverse_transform method, it is passed to the RegressionModel to be applied to predictions/targets on the original scale.
+        target_inverse_transform = None
+        if transform_y is not None and hasattr(transform_y, 'inverse_transform'):
+            target_inverse_transform = transform_y.inverse_transform
+
+        # Initializes the RegressionModel Lightning module.
+        lightning_model = RegressionModel(
+            neural_network,
+            learning_rate=config['trainer']['learning_rate'],
+            target_inverse_transform=target_inverse_transform,
+        )
 
     # Sets up the PyTorch Lightning Trainer with the specified maximum epochs, accelerator, devices, logger, and callbacks for model checkpointing and early stopping based on validation loss.
     trainer = L.Trainer(
@@ -120,7 +148,7 @@ def main(config):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train a rainfall regression model.")
+    parser = argparse.ArgumentParser(description="Train a rainfall model (regression or binary classification).")
     parser.add_argument('--config', type=str, required=True, help='Path to the configuration file.')
     args = parser.parse_args()
     config = load_config(args.config)

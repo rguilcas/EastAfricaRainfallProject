@@ -5,25 +5,39 @@
 
 
 model:
-  model_name: ThreeLayerCNN   # Can be TwoHiddenLayerMLP, OneHiddenLayerMLP or TwoLayerCNN 
-  hidden_size_mlp: 64              # Number of neurons in the hidden layer for MLP models.
+  model_name: ThreeLayerCNN   # Can be TwoHiddenLayerMLP, OneHiddenLayerMLP, TwoLayerCNN, ThreeLayerCNN, or VisionTransformer.
+  hidden_size_mlp: 128             # MLP hidden size (used by MLP/CNN heads).
   # CNN only
   input_channels: 4              # Number of input variables. We only have 1 in the file we are using.
-  n_kernels_cnn: 8               # Number of kernels (convolutional filters) in the convolutional layers for CNN models.
+  n_kernels_cnn: 16              # More filters for richer spatial feature extraction.
   n_channels_input_cnn: 4         # Number of channels in the input data for CNN models. For example, if you have 3 input variables, this should be set to 3.
 
+  # VisionTransformer only (used when model_name: VisionTransformer)
+  patch_size: 4
+  embed_dim: 128
+  depth: 4
+  num_heads: 4
+  mlp_ratio: 4.0
+  dropout: 0.1
 data:
   data_in_name: preprocessed_features.nc                 # Predictor input path: either one NetCDF file or a folder of per-variable NetCDF files.
-  data_target_name: EastAfrica_mean_CHIRPS_7day.nc # Name of the target data file.
+  data_target_name: EastAfrica_mean_CHIRPS_7day_anom_std.nc # Name of the target data file.
   data_path: ./data # Path to the directory containing the data files.  
-  batch_size: 128                                         # Batch size for training and validation.
+  forecast_horizon_days: 50                              # X(t) predicts y(t..t+50 days). Use 0 for single-step y(t).
+  batch_size: 128                                         # Smaller batch can improve generalization and optimization stability.
   transform_X: StandardScalerX                            # Transformation to apply to the input data. Can be None or a class in src.data.transforms. 
-  transform_y: None                                       # Transformation to apply to the target data. Can be None or a class in src.data.transforms.        
+  # Use the same continuous target file for both tasks:
+  # - regression: set transform_y to MinMaxScalerY (or Log1pY)
+  # - classification: set transform_y to BinaryScalerY (or the dict form below for custom quantile)
+  transform_y:
+    name: None
+    quantile: 0.9
 
 trainer:
-  max_epochs: 20          # Number of epochs to train the model.
-  learning_rate: 0.0003   # Learning rate for the optimizer.
-  accelerator: gpu        # Accelerator to use for training. Can be 'cpu', 'gpu', or other things.  
+  task_type: regression   # Choose: regression or classification (binary).
+  max_epochs: 60          # More epochs with early stopping allows better convergence.
+  learning_rate: 0.001   # Lower LR is usually more stable for deeper CNN regression.
+  accelerator: auto       # Lets Lightning pick the best available backend on this machine.
   devices: 1              # Number of devices to use for training. For example, if you have 2 GPUs and want to use both, set this to 2.
 
 logging:

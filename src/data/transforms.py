@@ -76,3 +76,25 @@ class Log1pY:
         return torch.expm1(y)
     def __call__(self, y):
         return torch.log1p(y)
+    
+
+
+class BinaryScalerY:
+    """
+    Binarizes the target data by applying a threshold.
+    """
+    def __init__(self, quantile=0.5):
+        self.quantile = quantile
+        self.threshold = None
+        self.fitted = False
+    
+    def fit(self, dataset):
+        Y = torch.stack([dataset[i]['y'] for i in range(len(dataset))])
+        self.threshold = Y.quantile(self.quantile)
+        self.fitted = True
+
+    def inverse_transform(self, y):
+        return (y > self.threshold).float()
+    
+    def __call__(self, y):
+        return (y > self.threshold).float()
